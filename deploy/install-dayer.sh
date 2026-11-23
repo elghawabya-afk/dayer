@@ -35,6 +35,7 @@ fi
 # 3) Caddy route (append once, validate, roll back on failure)
 if grep -q "^$DOMAIN" "$CF"; then
   say "Caddy block already present"
+  docker exec "$C" grep -q "^$DOMAIN" /etc/caddy/Caddyfile 2>/dev/null || true
 else
   cp "$CF" "$CF.bak-dayer-$(date +%s)"
   cat >> "$CF" <<BLOCK
@@ -49,7 +50,8 @@ $DOMAIN {
 }
 BLOCK
   if docker exec "$C" caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
-    docker exec "$C" caddy reload --config /etc/caddy/Caddyfile >/dev/null && say "Caddy reloaded"
+    if docker exec "$C" caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1; then say "Caddy reloaded"
+    else docker restart "$C" >/dev/null && say "Caddy restarted (admin API is off on this server)"; fi
   else
     echo "VALIDATION FAILED - rolling back, RIVQAN untouched"
     cp "$(ls -t $CF.bak-dayer-* | head -1)" "$CF"; exit 1
